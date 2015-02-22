@@ -3,6 +3,7 @@
 //! Types and constants for WinAPI bindings.
 #![allow(bad_style, raw_pointer_derive)]
 #![warn(unused_qualifications, unused, unused_typecasts)]
+#![feature(alloc, core, unsafe_destructor)]
 
 //-------------------------------------------------------------------------------------------------
 // External crates
@@ -83,6 +84,73 @@ pub mod wingdi;
 pub mod winnt;
 pub mod winsvc;
 pub mod winuser;
+//-------------------------------------------------------------------------------------------------
+// Convenience things
+//-------------------------------------------------------------------------------------------------
+mod convenience {
+    use std::cmp::{max};
+    use std::marker::{PhantomData, PhantomFn};
+    use std::mem::{align_of, size_of};
+    use std::ops::{Deref, DerefMut};
+    use std::ptr::{zero_memory};
+    use std::rt::heap::{allocate, deallocate};
+    use std::slice::{from_raw_parts, from_raw_parts_mut};
+    pub struct BoxPlusArray<T, U> where T: HasUnsizedArray<U> {
+        _buf: *mut u8,
+        _len: usize,
+        _mark1: PhantomData<T>,
+        _mark2: PhantomData<[U]>,
+    }
+    impl<T, U> BoxPlusArray<T, U> where T: HasUnsizedArray<U> {
+        pub fn new(len: usize) -> BoxPlusArray<T, U> {
+            let align = max(align_of::<T>(), align_of::<U>());
+            let buf = unsafe { allocate(size_of::<T>() + len, align) };
+            unsafe { zero_memory(buf, size_of::<T>() + len) };
+            let mut thing: BoxPlusArray<T, U> = BoxPlusArray {
+                _buf: buf,
+                _len: len,
+                _mark1: PhantomData,
+                _mark2: PhantomData,
+            };
+            thing.set_size(len);
+            thing
+        }
+        pub fn array(&self) -> &[U] {
+            unsafe {
+                let ptr = self._buf.offset(size_of::<T>() as isize) as *const U;
+                from_raw_parts(ptr, self._len)
+            }
+        }
+        pub fn array_mut(&mut self) -> &mut [U] {
+            unsafe {
+                let ptr = self._buf.offset(size_of::<T>() as isize) as *mut U;
+                from_raw_parts_mut(ptr, self._len)
+            }
+        }
+    }
+    #[unsafe_destructor]
+    impl<T, U> Drop for BoxPlusArray<T, U> where T: HasUnsizedArray<U> {
+        fn drop(&mut self) {
+            let align = max(align_of::<T>(), align_of::<U>());
+            unsafe { deallocate(self._buf, size_of::<T>() + self._len, align) }
+        }
+    }
+    impl<T, U> Deref for BoxPlusArray<T, U> where T: HasUnsizedArray<U> {
+        type Target = T;
+        fn deref(&self) -> &T {
+            unsafe { &*(self._buf as *const T) }
+        }
+    }
+    impl<T, U> DerefMut for BoxPlusArray<T, U> where T: HasUnsizedArray<U> {
+        fn deref_mut(&mut self) -> &mut T {
+            unsafe { &mut *(self._buf as *mut T) }
+        }
+    }
+    pub trait HasUnsizedArray<T>: PhantomFn<T> {
+        fn set_size(&mut self, len: usize);
+    }
+}
+pub use convenience::BoxPlusArray;
 //-------------------------------------------------------------------------------------------------
 // Primitive types not defined by libc
 //-------------------------------------------------------------------------------------------------
@@ -439,6 +507,11 @@ pub struct XSAVE_FORMAT { // FIXME align 16
 pub struct TOKEN_PRIVILEGES {
     PrivilegeCount: DWORD,
     Privileges: [LUID_AND_ATTRIBUTES; 0],
+}
+impl convenience::HasUnsizedArray<LUID_AND_ATTRIBUTES> for TOKEN_PRIVILEGES {
+    fn set_size(&mut self, len: usize) {
+        self.PrivilegeCount = len as DWORD;
+    }
 }
 pub type PTOKEN_PRIVILEGES = *mut TOKEN_PRIVILEGES;
 #[repr(C)]
@@ -1427,7 +1500,12 @@ pub struct IContactManagerInterop;
 #[derive(Copy)]
 pub struct SHITEMID {
     pub cb: USHORT,
-    pub abID: [BYTE; 1],
+    pub abID: [BYTE; 0],
+}
+impl convenience::HasUnsizedArray<BYTE> for SHITEMID {
+    fn set_size(&mut self, len: usize) {
+        self.cb = len as USHORT;
+    }
 }
 pub type LPSHITEMID = *mut SHITEMID;
 pub type LPCSHITEMID = *const SHITEMID;

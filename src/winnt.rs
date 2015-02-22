@@ -281,7 +281,12 @@ pub type PFILE_ID_128 = *mut FILE_ID_128;
     pub NextEntryOffset: ::DWORD,
     pub Action: ::DWORD,
     pub FileNameLength: ::DWORD,
-    pub FileName: [::WCHAR; 1],
+    pub FileName: [::WCHAR; 0],
+}
+impl ::convenience::HasUnsizedArray<::WCHAR> for FILE_NOTIFY_INFORMATION {
+    fn set_size(&mut self, len: usize) {
+        self.FileNameLength = len as ::DWORD;
+    }
 }
 #[repr(C)] #[derive(Copy)] pub struct FILE_SEGMENT_ELEMENT {
     pub Buffer: ::PVOID64,
