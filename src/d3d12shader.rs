@@ -255,11 +255,6 @@ interface ID3D12ShaderReflectionVariable(ID3D12ShaderReflectionVariableVtbl) {
 
 RIDL!(
 interface ID3D12ShaderReflection(ID3D12ShaderReflectionVtbl): IUnknown(IUnknownVtbl) {
-    fn QueryInterface(
-        &mut self, iid: *const ::IID, ppv: *mut ::LPVOID
-    ) -> ::HRESULT,
-    fn AddRef(&mut self) -> ::ULONG,
-    fn Release(&mut self) -> ::ULONG,
     fn GetDesc(&mut self, pDesc: *mut ::D3D12_SHADER_DESC) -> ::HRESULT,
     fn GetConstantBufferByIndex(
         &mut self, Index: ::UINT
