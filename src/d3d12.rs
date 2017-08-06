@@ -1226,7 +1226,9 @@ STRUCT!{struct D3D12_CONSTANT_BUFFER_VIEW_DESC {
     SizeInBytes: ::UINT,
 }}
 
-STRUCT!{struct D3D12_CPU_DESCRIPTOR_HANDLE {
+STRUCT!{
+#[derive(Hash)]
+struct D3D12_CPU_DESCRIPTOR_HANDLE {
     ptr: ::SIZE_T,
 }}
 
